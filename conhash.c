@@ -216,36 +216,3 @@ NODE_S* conhash_lookup(CONHASH_S *conhash,const CHAR *object)
 	return NULL;
 }
 
-int main()
-{
-	//	char *kk = "linyuanpeng99999999999999999999999999999999999999";
-	//	char *kk1 = "linyuanpenk99999999999999999999999999999999999999";
-	//	long k = conhash_hash_fun_md5(kk);
-	//	long k1 = conhash_hash_fun_md5(kk1);
-	//	printf("%ld\n",k);
-	//	printf("%ld\n",k1);
-	//
-	char str[256];
-	char buf[256];
-	CONHASH_S *conhash = conhash_init(NULL);
-	NODE_S nodes[64];
-
-	conhash_set_node(&nodes[0],"KK1",32);
-	conhash_set_node(&nodes[1],"KK2",32);
-	node2string(&nodes[0],1,buf);
-	printf("%s\n",buf);
-
-	conhash_add_node(conhash,&nodes[0]);
-	//conhash_add_node(&conhash,&nodes[1]);
-	int i = 0;
-	for(;i<2;i++)
-	{
-		sprintf(buf,"kkkkkkkk%03d\n",i);
-		const struct node_s  *node;
-		node = conhash_lookup(conhash, str);
-		if(node)
-			printf("[%16s] is in node: [%16s]\n", buf, node->iden);
-	}
-
-	return 0;
-}
