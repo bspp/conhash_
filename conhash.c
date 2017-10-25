@@ -215,4 +215,6 @@ NODE_S* conhash_lookup(CONHASH_S *conhash,const CHAR *object)
 	}
 	return NULL;
 }
+int main(){
+}
 
