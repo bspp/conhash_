@@ -121,7 +121,7 @@ static void conhash_del_replicas(CONHASH_S *conhash,NODE_S *node)
 			if((vnode->hash == hash) && (vnode->node == node))
 			{
 				util_rbtree_delete(&(conhash->vnode_tree),rbnode);
-				conhash_del_node(rbnode);
+				conhash_del_rbnode(rbnode);
 			}
 		}
 	}
