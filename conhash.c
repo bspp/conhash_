@@ -34,9 +34,9 @@ LONG conhash_hash_fun_md5(const CHAR *instr)
 
 }/*"LONG conhash_hash_fun_md5 获取哈希码"*/
 
-static void node2string(const  NODE_S *node,UINT32 replica_idx,CHAR *buf)
+static void metis_node2string(const  NODE_S *node,UINT32 replica_idx,CHAR *buf)
 {
-	snprintf(buf,127,"%s-%03d",node->iden,replica_idx);
+	snprintf(buf,127,"%s00%d",node->iden,replica_idx);
 }
 
 util_rbtree_node_t *conhash_get_rbnode(NODE_S *node,long hash)
@@ -76,19 +76,19 @@ static void conhash_add_replicas(CONHASH_S *conhash,NODE_S *node)
 
 	for(;i < node->replica;i++)
 	{
-		node2string(node,i,buff);
+		metis_node2string(node,i,buff);
 		hash = conhash->hashfunc(buff);
-		
-				//add virtual node
-				if(util_rbtree_search(&(conhash->vnode_tree),hash) == NULL)
-				{
-					rbnode = conhash_get_rbnode(node,hash);
-					if(rbnode != NULL)
-					{
-						util_rbtree_insert(&(conhash->vnode_tree),rbnode);
-						conhash->ivnodes++;
-					}
-				}
+
+		//add virtual node
+		if(util_rbtree_search(&(conhash->vnode_tree),hash) == NULL)
+		{
+			rbnode = conhash_get_rbnode(node,hash);
+			if(rbnode != NULL)
+			{
+				util_rbtree_insert(&(conhash->vnode_tree),rbnode);
+				conhash->ivnodes++;
+			}
+		}
 	}
 }/*static void replicas conhash_add_replicas*/
 
@@ -111,7 +111,7 @@ static void conhash_del_replicas(CONHASH_S *conhash,NODE_S *node)
 
 	for(i = 0;i < node->replica;i++)
 	{
-		node2string(node,i,buff);
+		metis_node2string(node,i,buff);
 		hash = conhash->hashfunc(buff);
 
 		rbnode = util_rbtree_search(&(conhash->vnode_tree),hash);
@@ -122,14 +122,16 @@ static void conhash_del_replicas(CONHASH_S *conhash,NODE_S *node)
 			{
 				util_rbtree_delete(&(conhash->vnode_tree),rbnode);
 				conhash_del_rbnode(rbnode);
+				conhash->ivnodes--;
 			}
 		}
 	}
 }/*static void conhash_del_replicas*/
 
-CONHASH_S* conhash_init(conhash_hashfunc pfhash)
+CONHASH_S* conhash_init(conhash_hashfunc pfhash, CHAR **ppcNodeIds,INT32 iNodeNums,UINT32 replica)
 {
 	CONHASH_S *conhash = (CONHASH_S *)malloc(sizeof(CONHASH_S));
+	INT32 i = 0;
 	if(conhash == NULL)
 	{
 		return NULL;
@@ -143,13 +145,36 @@ CONHASH_S* conhash_init(conhash_hashfunc pfhash)
 		conhash->hashfunc = conhash_hash_fun_md5;
 	}
 	util_rbtree_init(&conhash->vnode_tree);
+	if(conhash != NULL)
+	{
+		for(;i < iNodeNums;i++)
+		{
+			NODE_S *node =  conhash_set_node(ppcNodeIds[i],replica);
+			if (node == NULL)
+			{
+				printf("Node %s add fail",ppcNodeIds);
+				continue;
+			}
+			if(conhash_add_node(conhash,node) != 0)
+			{
+				printf("Node %s add fail",ppcNodeIds);
+			}
+		}
+	}
+
 	return conhash;
 }
 
 /* iden:node information */
 /* replica:number of virtual node*/
-void conhash_set_node(NODE_S *node,const CHAR *iden,UINT32 replica)
-{
+NODE_S* conhash_set_node(const CHAR *iden,UINT32 replica)
+{ 
+	NODE_S *node = (NODE_S *)malloc(sizeof(NODE_S));
+	if (node == NULL)
+	{   
+		return NULL;
+	}   
+
 	strncpy(node->iden,iden,sizeof(node->iden)-1);
 	node->replica = replica;
 
@@ -182,20 +207,45 @@ NODE_S *conhash_get_node(CONHASH_S *conhash,CHAR *instr)
 	{
 		vnode = rbnode->data;
 		return vnode->node;
+	}else{
+		printf("Not find\n");
 	}
-	
+
 	return NULL;
 }
 
 /*delete node*/
-int conhash_del_node(CONHASH_S *conhash,NODE_S *node)
+void conhash_del_node(CONHASH_S *conhash,CHAR *instr)
 {
-	if((conhash == NULL) || node == NULL)
-		return -1;
+	if(conhash == NULL)
+		return;
 
+	NODE_S *node = conhash_get_node(conhash,instr);
+	if(node == NULL){
+		return;
+	}
 	conhash_del_replicas(conhash,node);
+	free(node);
+	node = NULL;
 }/*int conhash_del_node*/
 
+void conhash_free_node(CONHASH_S *conhash)
+{
+  if(conhash == NULL)
+			return;
+	VIRTUAL_NODE_S *vnode;
+	while(conhash->ivnodes > 0)
+	{
+		util_rbtree_node_t *root = conhash->vnode_tree.root;
+		if(root != NULL)
+		{
+			vnode = root->data;
+			conhash_del_replicas(conhash,vnode->node);
+			free(vnode->node);
+		}
+	}
+	free(conhash);
+}
 NODE_S* conhash_lookup(CONHASH_S *conhash,const CHAR *object)
 {
 	LONG hash;
@@ -216,5 +266,40 @@ NODE_S* conhash_lookup(CONHASH_S *conhash,const CHAR *object)
 	return NULL;
 }
 int main(){
+	char *a[]={"node1","node2","node3"};
+	CONHASH_S *conhash = conhash_init(NULL,a,3,12);
+	conhash_free_node(conhash);
+
+	int i = 0;
+	//for(;i<3;i++)
+	//{
+	//	conhash_del_node(conhash,a[i]);
+	//}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
