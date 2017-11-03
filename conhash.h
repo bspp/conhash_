@@ -32,7 +32,9 @@ struct conhash_s
 typedef struct conhash_s CONHASH_S;
 
 typedef LONG (*conhash_hashfunc)(const CHAR *instr);/*hash function*/
-NODE_S* conhash_set_node(const CHAR *iden,UINT32 replica);
+CONHASH_S* conhash_init(conhash_hashfunc pfhash, CHAR **ppcNodeIds,INT32 iNodeNums,UINT32 replica);
+NODE_S* conhash_add_node(CONHASH_S *conhash,const CHAR *iden,UINT32 replica);
+
 
 
 #endif
